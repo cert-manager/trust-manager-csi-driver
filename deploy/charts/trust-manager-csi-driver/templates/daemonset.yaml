@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "trust-manager-csi-driver.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{ include "trust-manager-csi-driver.labels" . | nindent 4 }}
+  {{- with .Values.daemonSetAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "trust-manager-csi-driver.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "trust-manager-csi-driver.name" . }}
+        {{- include "trust-manager-csi-driver.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        kubectl.kubernetes.io/default-container: trust-manager-csi-driver
+        {{- if .Values.podAnnotations }}
+          {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "trust-manager-csi-driver.name" . }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      containers:
+        - name: node-driver-registrar
+          image: "{{ template "image" (tuple .Values.nodeDriverRegistrarImage $.Chart.AppVersion) }}"
+          imagePullPolicy: {{ .Values.nodeDriverRegistrarImage.pullPolicy }}
+          args:
+            - -v={{ .Values.app.logLevel }}
+            - --csi-address=/plugin/csi.sock
+            - --kubelet-registration-path={{ .Values.app.kubeletRootDir }}/plugins/trust-manager-csi-driver/csi.sock
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /plugin
+            - name: registration-dir
+              mountPath: /registration
+        - name: liveness-probe
+          image: "{{ template "image" (tuple .Values.livenessProbeImage $.Chart.AppVersion) }}"
+          imagePullPolicy: {{ .Values.livenessProbeImage.pullPolicy }}
+          args:
+            - --csi-address=/plugin/csi.sock
+            - --probe-timeout=3s
+            - --health-port={{.Values.app.livenessProbe.port}}
+            - -v={{ .Values.app.logLevel }}
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /plugin
+        - name: trust-manager-csi-driver
+          securityContext:
+            readOnlyRootFilesystem: true
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+            runAsUser: 0
+          image: "{{ template "image" (tuple .Values.image $.Chart.AppVersion) }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args :
+            - --node-id=$(NODE_ID)
+            - --log-level={{ .Values.app.logLevel }}
+            - --driver-name={{ .Values.app.driver.name }}
+            - --endpoint=$(CSI_ENDPOINT)
+            - --data-root=csi-data-dir
+            {{- if .Values.metrics.enabled }}
+            - --metrics-bind-address=:{{ .Values.metrics.port }}
+            {{- else }}
+            - --metrics-bind-address=0
+            {{- end }}
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CSI_ENDPOINT
+              value: unix://plugin/csi.sock
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /plugin
+            - name: pods-mount-dir
+              mountPath: {{ .Values.app.kubeletRootDir }}/pods
+              mountPropagation: "Bidirectional"
+            - name: csi-data-dir
+              mountPath: /csi-data-dir
+              mountPropagation: "Bidirectional"
+          ports:
+            - containerPort: {{.Values.app.livenessProbe.port}}
+              name: healthz
+            {{- if .Values.metrics.enabled }}
+            - containerPort: {{ .Values.metrics.port }}
+              name: http-metrics
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      volumes:
+        - name: plugin-dir
+          hostPath:
+            path: {{ .Values.app.kubeletRootDir }}/plugins/trust-manager-csi-driver
+            type: DirectoryOrCreate
+        - name: pods-mount-dir
+          hostPath:
+            path: {{ .Values.app.kubeletRootDir }}/pods
+            type: Directory
+        - name: registration-dir
+          hostPath:
+            path: {{ .Values.app.kubeletRootDir }}/plugins_registry
+            type: Directory
+        - name: csi-data-dir
+          hostPath:
+            path: {{ .Values.app.driver.csiDataDir }}
+            type: DirectoryOrCreate

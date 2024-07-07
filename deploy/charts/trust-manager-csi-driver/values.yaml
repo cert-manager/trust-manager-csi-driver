@@ -1,0 +1,218 @@
+metrics:
+  # Enable the metrics server on csi-driver pods.
+  # If false, the metrics server will be disabled and the other metrics fields below will be ignored.
+  enabled: true
+  # The TCP port on which the metrics server will listen.
+  port: 9402
+  podmonitor:
+    # Create a PodMonitor to add csi-driver to Prometheus if you are using Prometheus Operator.
+    # See https://prometheus-operator.dev/docs/operator/api/#monitoring.coreos.com/v1.PodMonitor
+    enabled: false
+
+    # The namespace that the pod monitor should live in, defaults
+    # to the cert-manager-csi-driver namespace.
+    # +docs:property
+    # namespace: cert-manager
+
+    # Specifies the `prometheus` label on the created PodMonitor. This is
+    # used when different Prometheus instances have label selectors matching
+    # different PodMonitors.
+    prometheusInstance: default
+
+    # The interval to scrape metrics.
+    interval: 60s
+
+    # The timeout before a metrics scrape fails.
+    scrapeTimeout: 30s
+
+    # Additional labels to add to the PodMonitor.
+    labels: {}
+
+    # Additional annotations to add to the PodMonitor.
+    annotations: {}
+
+    # Keep labels from scraped data, overriding server-side labels.
+    honorLabels: false
+
+    # EndpointAdditionalProperties allows setting additional properties on the
+    # endpoint such as relabelings, metricRelabelings etc.
+    #
+    # For example:
+    #  endpointAdditionalProperties:
+    #   relabelings:
+    #   - action: replace
+    #     sourceLabels:
+    #     - __meta_kubernetes_pod_node_name
+    #     targetLabel: instance
+    #
+    # +docs:property
+    endpointAdditionalProperties: {}
+
+image:
+  # Target image registry. This value is prepended to the target image repository, if set.
+  # For example:
+  #   registry: quay.io
+  #   repository: jetstack/cert-manager-csi-driver
+  # +docs:property
+  # registry: quay.io
+
+  # Target image repository.
+  repository: quay.io/jetstack/cert-manager-csi-driver
+
+  # Override the image tag to deploy by setting this variable.
+  # If no value is set, the chart's appVersion is used.
+  # +docs:property
+  # tag: vX.Y.Z
+
+  # Target image digest. Override any tag, if set.
+  # For example:
+  #   digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
+  # +docs:property
+  # digest: sha256:...
+
+  # Kubernetes imagePullPolicy on Deployment.
+  pullPolicy: IfNotPresent
+
+# Optional secrets used for pulling the csi-driver container image.
+#
+# For example:
+#  imagePullSecrets:
+#  - name: secret-name
+imagePullSecrets: []
+
+# Labels to apply to all resources.
+commonLabels: {}
+
+nodeDriverRegistrarImage:
+  # Target image registry. This value is prepended to the target image repository, if set.
+  # For example:
+  #   registry: registry.k8s.io
+  #   repository: sig-storage/csi-node-driver-registrar
+  # +docs:property
+  # registry: registry.k8s.io
+
+  # Target image repository.
+  repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
+
+  # Override the image tag to deploy by setting this variable.
+  # If no value is set, the chart's appVersion is used.
+  # +docs:property
+  tag: v2.10.0
+
+  # Target image digest. Override any tag, if set.
+  # For example:
+  #   digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
+  # +docs:property
+  # digest: sha256:...
+
+  # Kubernetes imagePullPolicy on Deployment.
+  pullPolicy: IfNotPresent
+
+livenessProbeImage:
+  # Target image registry. This value is prepended to the target image repository, if set.
+  # For example:
+  #   registry: registry.k8s.io
+  #   repository: sig-storage/livenessprobe
+  # +docs:property
+  # registry: registry.k8s.io
+
+  # Target image repository.
+  repository: registry.k8s.io/sig-storage/livenessprobe
+
+  # Override the image tag to deploy by setting this variable.
+  # If no value is set, the chart's appVersion is used.
+  # +docs:property
+  tag: v2.12.0
+
+  # Target image digest. Override any tag, if set.
+  # For example:
+  #   digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
+  # +docs:property
+  # digest: sha256:...
+
+  # Kubernetes imagePullPolicy on Deployment.
+  pullPolicy: IfNotPresent
+
+app:
+  # Verbosity of cert-manager-csi-driver logging.
+  logLevel: 1 # 1-5
+  # Options for CSI driver.
+  driver:
+    # Name of the driver to be registered with Kubernetes.
+    name: csi.trust-manager.io
+    # If enabled, this uses a CSI token request for creating
+    # CertificateRequests. CertificateRequests are created by mounting the
+    # pod's service accounts.
+    useTokenRequest: false
+    # Configures the hostPath directory that the driver writes and mounts volumes from.
+    csiDataDir: /tmp/cert-manager-csi-driver
+  # Options for the liveness container.
+  livenessProbe:
+    # The port that will expose the liveness of the csi-driver.
+    port: 9809
+  # Overrides the path to root kubelet directory in case of a non-standard Kubernetes install.
+  kubeletRootDir: /var/lib/kubelet
+
+# Optional additional annotations to add to the csi-driver DaemonSet.
+daemonSetAnnotations: {}
+
+# Optional additional annotations to add to the csi-driver pods.
+podAnnotations: {}
+
+# Optional additional labels to add to the csi-driver pods.
+podLabels: {}
+
+# Kubernetes pod resources requests/limits for cert-manager-csi-driver.
+#
+# For example:
+#  resources:
+#    limits:
+#      cpu: 100m
+#      memory: 128Mi
+#    requests:
+#      cpu: 100m
+#      memory: 128Mi
+resources: {}
+
+# Kubernetes node selector: node labels for pod assignment.
+# +docs:property=nodeSelector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Kubernetes affinity: constraints for pod assignment.
+#
+# For example:
+#  affinity:
+#    nodeAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#       nodeSelectorTerms:
+#       - matchExpressions:
+#         - key: foo.bar.com/role
+#           operator: In
+#           values:
+#           - master
+affinity: {}
+
+# Kubernetes pod tolerations for cert-manager-csi-driver.
+#
+# For example:
+#  tolerations:
+#  - operator: "Exists"
+tolerations: []
+
+# Optional priority class to be used for the csi-driver pods.
+priorityClassName: ""
+
+openshift:
+  securityContextConstraint:
+    # Include RBAC to allow the DaemonSet to "use" the specified
+    # SecurityContextConstraints.
+    #
+    # This value can either be a boolean true or false, or the string "detect".
+    # If set to "detect" then the securityContextConstraint is automatically
+    # enabled for openshift installs.
+    #
+    # +docs:type=boolean,string,null
+    enabled: detect
+    # Name of the SecurityContextConstraints to create RBAC for.
+    name: privileged
