@@ -10,7 +10,7 @@ metrics:
     enabled: false
 
     # The namespace that the pod monitor should live in, defaults
-    # to the cert-manager-csi-driver namespace.
+    # to the trust-manager-csi-driver namespace.
     # +docs:property
     # namespace: cert-manager
 
@@ -52,12 +52,12 @@ image:
   # Target image registry. This value is prepended to the target image repository, if set.
   # For example:
   #   registry: quay.io
-  #   repository: jetstack/cert-manager-csi-driver
+  #   repository: jetstack/trust-manager-csi-driver
   # +docs:property
   # registry: quay.io
 
   # Target image repository.
-  repository: quay.io/jetstack/cert-manager-csi-driver
+  repository: quay.io/jetstack/trust-manager-csi-driver
 
   # Override the image tag to deploy by setting this variable.
   # If no value is set, the chart's appVersion is used.
@@ -134,7 +134,7 @@ livenessProbeImage:
   pullPolicy: IfNotPresent
 
 app:
-  # Verbosity of cert-manager-csi-driver logging.
+  # Verbosity of trust-manager-csi-driver logging.
   logLevel: 1 # 1-5
   # Options for CSI driver.
   driver:
@@ -145,7 +145,7 @@ app:
     # pod's service accounts.
     useTokenRequest: false
     # Configures the hostPath directory that the driver writes and mounts volumes from.
-    csiDataDir: /tmp/cert-manager-csi-driver
+    csiDataDir: /tmp/trust-manager-csi-driver
   # Options for the liveness container.
   livenessProbe:
     # The port that will expose the liveness of the csi-driver.
@@ -162,7 +162,7 @@ podAnnotations: {}
 # Optional additional labels to add to the csi-driver pods.
 podLabels: {}
 
-# Kubernetes pod resources requests/limits for cert-manager-csi-driver.
+# Kubernetes pod resources requests/limits for trust-manager-csi-driver.
 #
 # For example:
 #  resources:
@@ -193,7 +193,7 @@ nodeSelector:
 #           - master
 affinity: {}
 
-# Kubernetes pod tolerations for cert-manager-csi-driver.
+# Kubernetes pod tolerations for trust-manager-csi-driver.
 #
 # For example:
 #  tolerations:
