@@ -71,7 +71,7 @@ EOF
 
 info "waiting cert be ready"
 
-kubectl wait --for=condition=Ready certificate/test-server
+kubectl wait --namespace example --for=condition=Ready certificate/test-server
 
 info "installing nginx"
 
@@ -133,12 +133,12 @@ EOF
 
 info "waiting for pod to be ready"
 
-kubectl wait --for=condition=Ready pod/example
+kubectl wait --namespace example --for=condition=Ready pod/example
 
 info "installing curl and strace"
 
-kubectl exec example -- sh -c 'apt update && apt install -y curl strace openssl ca-certificates-'
+kubectl exec --namespace example example -- sh -c 'apt update && apt install -y curl strace openssl ca-certificates-'
 
 info "copying in dummy cert"
 
-kubectl cp demo/dummy.pem example:/dummy.pem
+kubectl cp --namespace example demo/dummy.pem example:/dummy.pem

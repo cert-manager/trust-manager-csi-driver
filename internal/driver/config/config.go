@@ -3,7 +3,7 @@ package config
 import "path"
 
 const (
-	MetadataFileName = "metadata.json"
+	MetadataFileName = "metadata"
 )
 
 // Config is the config for the CSI driver
