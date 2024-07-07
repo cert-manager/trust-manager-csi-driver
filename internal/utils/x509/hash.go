@@ -6,36 +6,8 @@ import (
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
-	"fmt"
 	"strings"
-
-	volumeutil "github.com/cert-manager/trust-manager-csi-driver/third_party/k8s.io/kubernetes/pkg/volume/util"
 )
-
-// WriteOpenSSLHashFilesToStore will write all the certs found in a bundle to
-// a store in the same format `openssl rehash`.
-func WriteOpenSSLHashFilesToStore(bundle []byte, payload map[string]volumeutil.FileProjection) error {
-	count := map[string]int{}
-	return ForEachCertInBundle(bundle, func(cert *x509.Certificate, pem []byte) error {
-		// Calculate the cert hash
-		hash, err := CertificateSubjectHash(cert)
-		if err != nil {
-			return err
-		}
-
-		// Name is <hash>.<count>
-		name := fmt.Sprintf("%s.%d", hash, count[hash])
-		count[hash]++
-
-		// Write to the map
-		payload[name] = volumeutil.FileProjection{
-			Data: pem,
-			Mode: 0644,
-		}
-
-		return nil
-	})
-}
 
 // CertificateSubjectHash implements `openssl x509 -subject_hash`, outputting
 // an 8 character hexadecimal hash of the given Certificate subject.
@@ -59,7 +31,7 @@ func CertificateSubjectHash(cert *x509.Certificate) (string, error) {
 // - Strings are converted to UTF8
 // - Strings are trimmed, lowercased and double spaces are removed
 //
-// This mirrors the behavior of openssl, which does this normalization, when
+// This mirrors the behavior of openssl, which does this normalization when
 // hashing a certificate subject.
 func normalizeASN1ValueForHash(value asn1.RawValue) (_ asn1.RawValue, err error) {
 	// Depending on the "Tag" we may need to:
