@@ -1,3 +1,19 @@
+/*
+Copyright 2024 The cert-manager Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package server
 
 import (
@@ -10,15 +26,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cert-manager/trust-manager-csi-driver/internal/api/metadata"
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/bundlewriter"
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/state"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/cert-manager/trust-manager-csi-driver/internal/api/metadata"
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/bundlewriter"
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/state"
 )
 
 var _ csi.NodeServer = &NodeServer{}
@@ -59,7 +76,7 @@ func (n *NodeServer) NodeGetCapabilities(ctx context.Context, _ *csi.NodeGetCapa
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (_ *csi.NodePublishVolumeResponse, err error) {
 	n.once.Do(n.setup)
 
-	logger := log.FromContext(ctx).WithValues("volume_id", req.VolumeId, "target_path", req.TargetPath)
+	logger := log.FromContext(ctx).WithValues("volume_id", req.GetVolumeId(), "target_path", req.GetTargetPath())
 	logger.Info("starting volume publish")
 
 	// If the method fails for any reason we want to roll back the changes,
@@ -72,35 +89,35 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	// error checking.
 	defer func() {
 		if err != nil {
-			_ = n.State.StopSync(req.VolumeId)
-			_ = n.mounter.Unmount(req.TargetPath)
-			_ = os.RemoveAll(n.Config.RootPathForVolume(req.VolumeId))
+			_ = n.State.StopSync(req.GetVolumeId())
+			_ = n.mounter.Unmount(req.GetTargetPath())
+			_ = os.RemoveAll(n.Config.RootPathForVolume(req.GetVolumeId()))
 		}
 	}()
 
 	// Ephemeral volumes are when the volume is defined directly in the Pod spec
 	// instead of in a PVC. This is the only supported method since a PVC makes
 	// no sense for out use case.
-	if req.VolumeContext["csi.storage.k8s.io/ephemeral"] != "true" {
+	if req.GetVolumeContext()["csi.storage.k8s.io/ephemeral"] != "true" {
 		return nil, fmt.Errorf("only ephemeral volume types are supported")
 	}
 
 	// We don't want the directory to be writable, we need full control over the
 	// files
-	if !req.Readonly {
+	if !req.GetReadonly() {
 		return nil, status.Error(codes.InvalidArgument, "pod.spec.volumes[].csi.readOnly must be set to 'true'")
 	}
 
 	// trust-manager replicates the ConfigMap/Secret into the Pods namespace, so
 	// we need the Pods namespace to look up the ConfigMap/Secret
-	namespace := req.VolumeContext["csi.storage.k8s.io/pod.namespace"]
+	namespace := req.GetVolumeContext()["csi.storage.k8s.io/pod.namespace"]
 	if namespace == "" {
 		return nil, fmt.Errorf("namespace is not set in volume context")
 	}
 
 	// trust-manager replicates the ConfigMap/Secret into the Pods namespace, so
 	// we need the Pods namespace to look up the ConfigMap/Secret
-	bundle := req.VolumeContext["trust.cert-manager.io/bundle"]
+	bundle := req.GetVolumeContext()["trust.cert-manager.io/bundle"]
 	if namespace == "" {
 		return nil, fmt.Errorf("bundle is not set in volume context")
 	}
@@ -112,8 +129,8 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	//
 	// See: https://kubernetes-csi.github.io/docs/support-fsgroup.html#delegate-fsgroup-to-csi-driver
 	var gid *int64
-	if mount := req.VolumeCapability.GetMount(); mount != nil && mount.VolumeMountGroup != "" {
-		parsedGid, err := strconv.ParseInt(mount.VolumeMountGroup, 10, 64)
+	if mount := req.GetVolumeCapability().GetMount(); mount != nil && mount.GetVolumeMountGroup() != "" {
+		parsedGid, err := strconv.ParseInt(mount.GetVolumeMountGroup(), 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse volume_mount_group")
 		}
@@ -121,12 +138,12 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		gid = &parsedGid
 	}
 
-	files, err := splitList(req.VolumeContext["trust.cert-manager.io/concatenated-files"])
+	files, err := splitList(req.GetVolumeContext()["trust.cert-manager.io/concatenated-files"])
 	if err != nil {
 		return nil, fmt.Errorf("could not parse concatenated-files: %w", err)
 	}
 
-	hashes, err := splitList(req.VolumeContext["trust.cert-manager.io/openssl-rehash"])
+	hashes, err := splitList(req.GetVolumeContext()["trust.cert-manager.io/openssl-rehash"])
 	if err != nil {
 		return nil, fmt.Errorf("could not parse openssl-rehash: %w", err)
 	}
@@ -134,7 +151,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	// Build the metadata object, this needs to contain all the information to
 	// reconcile this mount.
 	meta := metadata.Metadata{
-		VolumeID:     req.VolumeId,
+		VolumeID:     req.GetVolumeId(),
 		PodNamespace: namespace,
 		Bundle:       bundle,
 	}
@@ -166,22 +183,22 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	// Create the volume root/data directories, the data directory is what is
 	// bind mounted to req.TargetPath
 	logger.Info("creating volume root directory")
-	if err := os.MkdirAll(n.Config.DataPathForVolume(req.VolumeId), 0440); err != nil {
+	if err := os.MkdirAll(n.Config.DataPathForVolume(req.GetVolumeId()), 0440); err != nil {
 		return nil, fmt.Errorf("failed to create volume directory: %w", err)
 	}
 
 	// First attempt a sync, we want the data in place before the Pod starts, so
 	// we sync the data before adding to state
 	logger.Info("performing initial volume sync")
-	if err := n.BundleWriter.Sync(ctx, meta, n.Config.DataPathForVolume(req.VolumeId)); err != nil {
+	if err := n.BundleWriter.Sync(ctx, meta, n.Config.DataPathForVolume(req.GetVolumeId())); err != nil {
 		return nil, fmt.Errorf("failed perform initial volume sync: %w", err)
 	}
 
 	// Create bind mount from our data directory to req.TargetPath
-	isMnt, err := n.mounter.IsMountPoint(req.TargetPath)
+	isMnt, err := n.mounter.IsMountPoint(req.GetTargetPath())
 
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(req.TargetPath, 0440)
+		err = os.MkdirAll(req.GetTargetPath(), 0440)
 	}
 
 	if err != nil {
@@ -190,7 +207,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	if !isMnt {
 		logger.Info("creating bind mount")
-		if err := n.mounter.Mount(n.Config.DataPathForVolume(req.VolumeId), req.TargetPath, "", []string{"bind", "ro"}); err != nil {
+		if err := n.mounter.Mount(n.Config.DataPathForVolume(req.GetVolumeId()), req.GetTargetPath(), "", []string{"bind", "ro"}); err != nil {
 			return nil, err
 		}
 	}
@@ -208,18 +225,18 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	n.once.Do(n.setup)
 
-	logger := log.FromContext(ctx).WithValues("volume_id", req.VolumeId, "target_path", req.TargetPath)
+	logger := log.FromContext(ctx).WithValues("volume_id", req.GetVolumeId(), "target_path", req.GetTargetPath())
 	logger.Info("starting volume unpublish")
 
 	// Remove the volume from the state, this will stop the controller syncing
 	// the volume while we clean up.
 	logger.Info("stopping sync for volume")
-	if err := n.State.StopSync(req.VolumeId); err != nil {
+	if err := n.State.StopSync(req.GetVolumeId()); err != nil {
 		return &csi.NodeUnpublishVolumeResponse{}, err
 	}
 
 	// Check if the target path is a mount point
-	isMnt, err := n.mounter.IsMountPoint(req.TargetPath)
+	isMnt, err := n.mounter.IsMountPoint(req.GetTargetPath())
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +244,7 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	// Clean up the bind mount
 	if isMnt {
 		logger.Info("unmounting volume")
-		if err := n.mounter.Unmount(req.TargetPath); err != nil {
+		if err := n.mounter.Unmount(req.GetTargetPath()); err != nil {
 			return nil, err
 		}
 	}
@@ -236,7 +253,7 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	// of this so gets handled by this call. The metadata file is also in this
 	// directory cleaning this up.
 	logger.Info("cleaning up volume")
-	if err := os.RemoveAll(n.Config.RootPathForVolume(req.VolumeId)); err != nil && !os.IsNotExist(err) {
+	if err := os.RemoveAll(n.Config.RootPathForVolume(req.GetVolumeId())); err != nil && !os.IsNotExist(err) {
 		return &csi.NodeUnpublishVolumeResponse{}, err
 	}
 
@@ -261,7 +278,6 @@ func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequ
 }
 
 func (n *NodeServer) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	fmt.Println(n.Config)
 	return &csi.NodeGetInfoResponse{
 		NodeId: n.Config.NodeID,
 	}, nil

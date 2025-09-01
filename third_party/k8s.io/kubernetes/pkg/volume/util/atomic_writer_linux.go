@@ -19,13 +19,9 @@ limitations under the License.
 
 package util
 
-import (
-	"os"
-
-	"github.com/go-logr/logr"
-)
+import "os"
 
 // chown changes the numeric uid and gid of the named file.
-func (w *AtomicWriter) chown(_ logr.Logger, name string, uid, gid int) error {
+func (w *AtomicWriter) chown(name string, uid, gid int) error {
 	return os.Chown(name, uid, gid)
 }

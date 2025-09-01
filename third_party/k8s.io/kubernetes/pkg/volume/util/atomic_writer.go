@@ -18,7 +18,6 @@ package util
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -27,9 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -44,7 +42,7 @@ const (
 //
 // Note:
 //
-//  1. AtomicWriter reserves the set of path names starting with `..`.
+//  1. AtomicWriter reserves the set of pathnames starting with `..`.
 //  2. AtomicWriter offers no concurrency guarantees and must be synchronized
 //     by the caller.
 //
@@ -56,10 +54,11 @@ const (
 // data directory symlink.
 //
 // Consumers of the target directory can monitor the ..data symlink using
-// inotify or fsnotify to receive events when the content in the volume is
+// inotify or fanotify to receive events when the content in the volume is
 // updated.
 type AtomicWriter struct {
-	targetDir string
+	targetDir  string
+	logContext string
 }
 
 // FileProjection contains file Data and access Mode
@@ -72,13 +71,13 @@ type FileProjection struct {
 
 // NewAtomicWriter creates a new AtomicWriter configured to write to the given
 // target directory, or returns an error if the target directory does not exist.
-func NewAtomicWriter(targetDir string) (*AtomicWriter, error) {
+func NewAtomicWriter(targetDir string, logContext string) (*AtomicWriter, error) {
 	_, err := os.Stat(targetDir)
 	if os.IsNotExist(err) {
 		return nil, err
 	}
 
-	return &AtomicWriter{targetDir: targetDir}, nil
+	return &AtomicWriter{targetDir: targetDir, logContext: logContext}, nil
 }
 
 const (
@@ -139,13 +138,11 @@ const (
 //  11. Old paths are removed from the user-visible portion of the target directory.
 //
 //  12. The previous timestamped directory is removed, if it exists.
-func (w *AtomicWriter) Write(ctx context.Context, payload map[string]FileProjection, setPerms func(subPath string) error) error {
-	logger := log.FromContext(ctx)
-
+func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(subPath string) error) error {
 	// (1)
 	cleanPayload, err := validatePayload(payload)
 	if err != nil {
-		logger.Error(err, "invalid payload")
+		klog.Errorf("%s: invalid payload: %v", w.logContext, err)
 		return err
 	}
 
@@ -154,7 +151,7 @@ func (w *AtomicWriter) Write(ctx context.Context, payload map[string]FileProject
 	oldTsDir, err := os.Readlink(dataDirPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logger.Error(err, "error reading link for data directory")
+			klog.Errorf("%s: error reading link for data directory: %v", w.logContext, err)
 			return err
 		}
 		// although Readlink() returns "" on err, don't be fragile by relying on it (since it's not specified in docs)
@@ -168,18 +165,18 @@ func (w *AtomicWriter) Write(ctx context.Context, payload map[string]FileProject
 	// if there was no old version, there's nothing to remove
 	if len(oldTsDir) != 0 {
 		// (3)
-		pathsToRemove, err = w.pathsToRemove(logger, cleanPayload, oldTsPath)
+		pathsToRemove, err = w.pathsToRemove(cleanPayload, oldTsPath)
 		if err != nil {
-			logger.Error(err, "error determining user-visible files to remove")
+			klog.Errorf("%s: error determining user-visible files to remove: %v", w.logContext, err)
 			return err
 		}
 
 		// (4)
 		if should, err := shouldWritePayload(cleanPayload, oldTsPath); err != nil {
-			logger.Error(err, "error determining whether payload should be written to disk")
+			klog.Errorf("%s: error determining whether payload should be written to disk: %v", w.logContext, err)
 			return err
 		} else if !should && len(pathsToRemove) == 0 {
-			logger.V(4).Info("write not required for data directory", "dir", oldTsDir)
+			klog.V(4).Infof("%s: write not required for data directory %v", w.logContext, oldTsDir)
 			// data directory is already up to date, but we need to make sure that
 			// the user-visible symlinks are created.
 			// See https://github.com/kubernetes/kubernetes/issues/121472 for more details.
@@ -187,30 +184,30 @@ func (w *AtomicWriter) Write(ctx context.Context, payload map[string]FileProject
 			shouldWrite = false
 			oldTsDir = ""
 		} else {
-			logger.V(4).Info("write required for target directory", "dir", w.targetDir)
+			klog.V(4).Infof("%s: write required for target directory %v", w.logContext, w.targetDir)
 		}
 	}
 
 	if shouldWrite {
 		// (5)
-		tsDir, err := w.newTimestampDir(logger)
+		tsDir, err := w.newTimestampDir()
 		if err != nil {
-			logger.Error(err, "error creating new ts data director")
+			klog.V(4).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
 			return err
 		}
 		tsDirName := filepath.Base(tsDir)
 
 		// (6)
-		if err = w.writePayloadToDir(logger, cleanPayload, tsDir); err != nil {
-			logger.Error(err, "error writing payload to ts data directory", "dir", tsDir)
+		if err = w.writePayloadToDir(cleanPayload, tsDir); err != nil {
+			klog.Errorf("%s: error writing payload to ts data directory %s: %v", w.logContext, tsDir, err)
 			return err
 		}
-		logger.V(4).Info("performed write of new data to ts data directory", "dir", w.targetDir)
+		klog.V(4).Infof("%s: performed write of new data to ts data directory: %s", w.logContext, tsDir)
 
 		// (7)
 		if setPerms != nil {
 			if err := setPerms(tsDirName); err != nil {
-				logger.Error(err, "error applying ownership settings")
+				klog.Errorf("%s: error applying ownership settings: %v", w.logContext, err)
 				return err
 			}
 		}
@@ -219,52 +216,52 @@ func (w *AtomicWriter) Write(ctx context.Context, payload map[string]FileProject
 		newDataDirPath := filepath.Join(w.targetDir, newDataDirName)
 		if err = os.Symlink(tsDirName, newDataDirPath); err != nil {
 			if err := os.RemoveAll(tsDir); err != nil {
-				logger.Error(err, "error removing new ts directory", "dir", tsDir)
+				klog.Errorf("%s: error removing new ts directory %s: %v", w.logContext, tsDir, err)
 			}
-			logger.Error(err, "error creating symbolic link for atomic update")
+			klog.Errorf("%s: error creating symbolic link for atomic update: %v", w.logContext, err)
 			return err
 		}
 
 		// (9)
 		if runtime.GOOS == "windows" {
 			if err := os.Remove(dataDirPath); err != nil {
-				logger.Error(err, "error removing data dir directory", "dir", dataDirPath)
+				klog.Errorf("%s: error removing data dir directory %s: %v", w.logContext, dataDirPath, err)
 			}
 			err = os.Symlink(tsDirName, dataDirPath)
 			if err := os.Remove(newDataDirPath); err != nil {
-				logger.Error(err, "error removing new data dir directory", "dir", newDataDirPath)
+				klog.Errorf("%s: error removing new data dir directory %s: %v", w.logContext, newDataDirPath, err)
 			}
 		} else {
 			err = os.Rename(newDataDirPath, dataDirPath)
 		}
 		if err != nil {
 			if err := os.Remove(newDataDirPath); err != nil && err != os.ErrNotExist {
-				logger.Error(err, "error removing new data dir directory", "dir", newDataDirPath)
+				klog.Errorf("%s: error removing new data dir directory %s: %v", w.logContext, newDataDirPath, err)
 			}
 			if err := os.RemoveAll(tsDir); err != nil {
-				logger.Error(err, "error removing new ts directory", "dir", tsDir)
+				klog.Errorf("%s: error removing new ts directory %s: %v", w.logContext, tsDir, err)
 			}
-			logger.Error(err, "error renaming symbolic link for data director", "dir", newDataDirPath)
+			klog.Errorf("%s: error renaming symbolic link for data directory %s: %v", w.logContext, newDataDirPath, err)
 			return err
 		}
 	}
 
 	// (10)
 	if err = w.createUserVisibleFiles(cleanPayload); err != nil {
-		logger.Error(err, "error creating visible symlinks", "dir", w.targetDir)
+		klog.Errorf("%s: error creating visible symlinks in %s: %v", w.logContext, w.targetDir, err)
 		return err
 	}
 
 	// (11)
-	if err = w.removeUserVisiblePaths(logger, pathsToRemove); err != nil {
-		logger.Error(err, "error removing old visible symlinks")
+	if err = w.removeUserVisiblePaths(pathsToRemove); err != nil {
+		klog.Errorf("%s: error removing old visible symlinks: %v", w.logContext, err)
 		return err
 	}
 
 	// (12)
 	if len(oldTsDir) > 0 {
 		if err = os.RemoveAll(oldTsPath); err != nil {
-			logger.Error(err, "error removing old data directory", "dir", oldTsDir)
+			klog.Errorf("%s: error removing old data directory %s: %v", w.logContext, oldTsDir, err)
 			return err
 		}
 	}
@@ -360,7 +357,7 @@ func shouldWriteFile(path string, content []byte) (bool, error) {
 // pathsToRemove walks the current version of the data directory and
 // determines which paths should be removed (if any) after the payload is
 // written to the target directory.
-func (w *AtomicWriter) pathsToRemove(logger logr.Logger, payload map[string]FileProjection, oldTSDir string) (sets.Set[string], error) {
+func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTSDir string) (sets.Set[string], error) {
 	paths := sets.New[string]()
 	visitor := func(path string, info os.FileInfo, err error) error {
 		relativePath := strings.TrimPrefix(path, oldTSDir)
@@ -379,7 +376,7 @@ func (w *AtomicWriter) pathsToRemove(logger logr.Logger, payload map[string]File
 	} else if err != nil {
 		return nil, err
 	}
-	logger.V(5).Info("current paths", "dir", w.targetDir, "paths", sets.List(paths))
+	klog.V(5).Infof("%s: current paths:   %+v", w.targetDir, sets.List(paths))
 
 	newPaths := sets.New[string]()
 	for file := range payload {
@@ -391,19 +388,19 @@ func (w *AtomicWriter) pathsToRemove(logger logr.Logger, payload map[string]File
 			subPath = strings.TrimSuffix(subPath, string(os.PathSeparator))
 		}
 	}
-	logger.V(5).Info("new paths", "dir", w.targetDir, "paths", sets.List(newPaths))
+	klog.V(5).Infof("%s: new paths:       %+v", w.targetDir, sets.List(newPaths))
 
 	result := paths.Difference(newPaths)
-	logger.V(5).Info("paths to remove", "dir", w.targetDir, "paths", result)
+	klog.V(5).Infof("%s: paths to remove: %+v", w.targetDir, result)
 
 	return result, nil
 }
 
 // newTimestampDir creates a new timestamp directory
-func (w *AtomicWriter) newTimestampDir(logger logr.Logger) (string, error) {
+func (w *AtomicWriter) newTimestampDir() (string, error) {
 	tsDir, err := os.MkdirTemp(w.targetDir, time.Now().UTC().Format("..2006_01_02_15_04_05."))
 	if err != nil {
-		logger.Error(err, "unable to create new temp directory")
+		klog.Errorf("%s: unable to create new temp directory: %v", w.logContext, err)
 		return "", err
 	}
 
@@ -412,7 +409,7 @@ func (w *AtomicWriter) newTimestampDir(logger logr.Logger) (string, error) {
 	// regardless of the process' umask.
 	err = os.Chmod(tsDir, 0755)
 	if err != nil {
-		logger.Error(err, "unable to set mode on new temp directory")
+		klog.Errorf("%s: unable to set mode on new temp directory: %v", w.logContext, err)
 		return "", err
 	}
 
@@ -421,7 +418,7 @@ func (w *AtomicWriter) newTimestampDir(logger logr.Logger) (string, error) {
 
 // writePayloadToDir writes the given payload to the given directory.  The
 // directory must exist.
-func (w *AtomicWriter) writePayloadToDir(logger logr.Logger, payload map[string]FileProjection, dir string) error {
+func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir string) error {
 	for userVisiblePath, fileProjection := range payload {
 		content := fileProjection.Data
 		mode := os.FileMode(fileProjection.Mode)
@@ -429,12 +426,12 @@ func (w *AtomicWriter) writePayloadToDir(logger logr.Logger, payload map[string]
 		baseDir, _ := filepath.Split(fullPath)
 
 		if err := os.MkdirAll(baseDir, os.ModePerm); err != nil {
-			logger.Error(err, "unable to create directory", "dir", baseDir)
+			klog.Errorf("%s: unable to create directory %s: %v", w.logContext, baseDir, err)
 			return err
 		}
 
 		if err := os.WriteFile(fullPath, content, mode); err != nil {
-			logger.Error(err, "unable to write file", "path", fullPath, "mode", mode)
+			klog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
 			return err
 		}
 		// Chmod is needed because os.WriteFile() ends up calling
@@ -442,7 +439,7 @@ func (w *AtomicWriter) writePayloadToDir(logger logr.Logger, payload map[string]
 		// ~umask". But we want to make sure the specified mode is used
 		// in the file no matter what the umask is.
 		if err := os.Chmod(fullPath, mode); err != nil {
-			logger.Error(err, "unable to change file mode", "path", fullPath, "mode", mode)
+			klog.Errorf("%s: unable to change file %s with mode %v: %v", w.logContext, fullPath, mode, err)
 			return err
 		}
 
@@ -452,8 +449,8 @@ func (w *AtomicWriter) writePayloadToDir(logger logr.Logger, payload map[string]
 
 		uid := ptr.Deref(fileProjection.FsUser, -1)
 		gid := ptr.Deref(fileProjection.FsGroup, -1)
-		if err := w.chown(logger, fullPath, int(uid), int(gid)); err != nil {
-			logger.Error(err, "unable to change file owner", "path", fullPath, "uid", uid, "gid", gid)
+		if err := w.chown(fullPath, int(uid), int(gid)); err != nil {
+			klog.Errorf("%s: unable to change file %s with owner %v: %v", w.logContext, fullPath, int(*fileProjection.FsUser), err)
 			return err
 		}
 	}
@@ -495,7 +492,7 @@ func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection)
 
 // removeUserVisiblePaths removes the set of paths from the user-visible
 // portion of the writer's target directory.
-func (w *AtomicWriter) removeUserVisiblePaths(logger logr.Logger, paths sets.Set[string]) error {
+func (w *AtomicWriter) removeUserVisiblePaths(paths sets.Set[string]) error {
 	ps := string(os.PathSeparator)
 	var lasterr error
 	for p := range paths {
@@ -504,7 +501,7 @@ func (w *AtomicWriter) removeUserVisiblePaths(logger logr.Logger, paths sets.Set
 			continue
 		}
 		if err := os.Remove(filepath.Join(w.targetDir, p)); err != nil {
-			logger.Error(err, "error pruning old user-visible path", "path", p)
+			klog.Errorf("%s: error pruning old user-visible path %s: %v", w.logContext, p, err)
 			lasterr = err
 		}
 	}

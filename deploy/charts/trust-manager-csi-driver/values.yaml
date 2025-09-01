@@ -1,3 +1,5 @@
+nameOverride: ""
+
 metrics:
   # Enable the metrics server on csi-driver pods.
   # If false, the metrics server will be disabled and the other metrics fields below will be ignored.

@@ -30,6 +30,9 @@
         "metrics": {
           "$ref": "#/$defs/helm-values.metrics"
         },
+        "nameOverride": {
+          "$ref": "#/$defs/helm-values.nameOverride"
+        },
         "nodeDriverRegistrarImage": {
           "$ref": "#/$defs/helm-values.nodeDriverRegistrarImage"
         },
@@ -341,6 +344,10 @@
       "default": 9402,
       "description": "The TCP port on which the metrics server will listen.",
       "type": "number"
+    },
+    "helm-values.nameOverride": {
+      "default": "",
+      "type": "string"
     },
     "helm-values.nodeDriverRegistrarImage": {
       "additionalProperties": false,
