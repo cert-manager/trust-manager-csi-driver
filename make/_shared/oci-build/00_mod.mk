@@ -16,14 +16,15 @@ oci_platforms ?= linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le
 
 # Use distroless as minimal base image to package the manager binary
 # To get latest SHA run "crane digest quay.io/jetstack/base-static:latest"
-base_image_static := quay.io/jetstack/base-static@sha256:23631cd1be9a63515cb5975e783284b209f7f9a449c02bb117f2a15413e13bfa
+base_image_static := quay.io/jetstack/base-static@sha256:3644c30edf618b9e84ed98af7f529b1e9e3d67a54fcd557083f91fc991a0031c
 
 # Use custom apko-built image as minimal base image to package the manager binary
 # To get latest SHA run "crane digest quay.io/jetstack/base-static-csi:latest"
-base_image_csi-static := quay.io/jetstack/base-static-csi@sha256:95b33b948da3790ac09f112486a1e9f10e3e705cfacc159cb7b12429b874c78f
+base_image_csi-static := quay.io/jetstack/base-static-csi@sha256:6adec8e50b746da4a707af588936b02c09126aa1c73035d6e0fb293643479e6d
 
 # Utility functions
 fatal_if_undefined = $(if $(findstring undefined,$(origin $1)),$(error $1 is not set))
+fatal_if_deprecated_defined = $(if $(findstring undefined,$(origin $1)),,$(error $1 is deprecated, use $2 instead))
 
 # Validate globals that are required
 $(call fatal_if_undefined,bin_dir)
@@ -37,9 +38,12 @@ GOEXPERIMENT ?=  # empty by default
 #
 # $1 - build_name
 define default_per_build_variables
-cgo_enabled_$1 ?= $(CGO_ENABLED)
-goexperiment_$1 ?= $(GOEXPERIMENT)
-oci_additional_layers_$1 ?= 
+go_$1_cgo_enabled ?= $(CGO_ENABLED)
+go_$1_goexperiment ?= $(GOEXPERIMENT)
+go_$1_flags ?= -tags=
+oci_$1_additional_layers ?= 
+oci_$1_linux_capabilities ?= 
+oci_$1_build_args ?= 
 endef
 
 $(foreach build_name,$(build_names),$(eval $(call default_per_build_variables,$(build_name))))
@@ -48,6 +52,11 @@ $(foreach build_name,$(build_names),$(eval $(call default_per_build_variables,$(
 #
 # $1 - build_name
 define check_per_build_variables
+# Validate deprecated variables
+$(call fatal_if_deprecated_defined,cgo_enabled_$1,go_$1_cgo_enabled)
+$(call fatal_if_deprecated_defined,goexperiment_$1,go_$1_goexperiment)
+$(call fatal_if_deprecated_defined,oci_additional_layers_$1,oci_$1_additional_layers)
+
 # Validate required config exists
 $(call fatal_if_undefined,go_$1_ldflags)
 $(call fatal_if_undefined,go_$1_main_dir)
@@ -119,7 +128,7 @@ ko_config_targets := $(build_names:%=ko-config-%)
 # - oci_digest_path_$(build_name) = path to the file that will contain the digests
 # - ko_config_path_$(build_name) = path to the ko config file
 # - docker_tarball_path_$(build_name) = path that the docker tarball that the docker-tarball-$(build_name) will produce
-$(foreach build_name,$(build_names),$(eval oci_layout_path_$(build_name) := $(bin_dir)/scratch/image/oci-layout-$(build_name).$(oci_$(build_name)_image_tag)))
+$(foreach build_name,$(build_names),$(eval oci_layout_path_$(build_name) := $(bin_dir)/scratch/image/oci-layout-$(build_name)))
 $(foreach build_name,$(build_names),$(eval oci_digest_path_$(build_name) := $(CURDIR)/$(oci_layout_path_$(build_name)).digests))
 $(foreach build_name,$(build_names),$(eval ko_config_path_$(build_name) := $(CURDIR)/$(oci_layout_path_$(build_name)).ko_config.yaml))
 $(foreach build_name,$(build_names),$(eval docker_tarball_path_$(build_name) := $(CURDIR)/$(oci_layout_path_$(build_name)).docker.tar))

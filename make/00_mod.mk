@@ -40,6 +40,7 @@ golangci_lint_config := .golangci.yaml
 # Helm
 helm_chart_source_dir := deploy/charts/trust-manager-csi-driver
 helm_chart_name := trust-manager-csi-driver
+helm_chart_image_name := quay.io/jetstack/charts/trust-manager-csi-driver
 helm_chart_version := $(VERSION)
 helm_labels_template_name := trust-manager-csi-driver.labels
 helm_docs_use_helm_tool := 1

@@ -10,18 +10,27 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   govulncheck:
     runs-on: ubuntu-latest
 
+    if: github.repository == 'cert-manager/trust-manager-csi-driver'
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        # Adding `fetch-depth: 0` makes sure tags are also fetched. We need
+        # the tags so `git describe` returns a valid version.
+        # see https://github.com/actions/checkout/issues/701 for extra info about this option
+        with: { fetch-depth: 0 }
 
       - id: go-version
         run: |
           make print-go-version >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: ${{ steps.go-version.outputs.result }}
 
