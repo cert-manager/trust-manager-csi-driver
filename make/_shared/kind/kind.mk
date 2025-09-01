@@ -39,7 +39,7 @@ $(bin_dir)/scratch/cluster-check: FORCE | $(NEEDS_KIND) $(bin_dir)/scratch
 	$(eval export KUBECONFIG=$(absolute_kubeconfig))
 
 kind_post_create_hook ?= 
-$(kind_kubeconfig): $(kind_cluster_config) $(bin_dir)/scratch/cluster-check | images-preload $(bin_dir)/scratch $(NEEDS_KIND) $(NEEDS_KUBECTL)
+$(kind_kubeconfig): $(kind_cluster_config) $(bin_dir)/scratch/cluster-check | images-preload $(bin_dir)/scratch $(NEEDS_KIND) $(NEEDS_KUBECTL) $(NEEDS_CTR)
 	@[ -f "$(bin_dir)/scratch/cluster-check" ] && ( \
 		$(KIND) delete cluster --name $(kind_cluster_name); \
 		$(CTR) load -i $(docker.io/kindest/node.TAR); \
@@ -55,9 +55,16 @@ $(kind_kubeconfig): $(kind_cluster_config) $(bin_dir)/scratch/cluster-check | im
 	$(KIND) get kubeconfig --name $(kind_cluster_name) > $@
 
 .PHONY: kind-cluster
+kind-cluster: $(kind_kubeconfig)
+
+.PHONY: kind-cluster-load
 ## Create Kind cluster and wait for nodes to be ready
+## Load the kubeconfig into the default location so that
+## it can be easily queried by kubectl. This target is
+## meant to be used directly, NOT as a dependency.
+## Use `kind-cluster` as a dependency instead.
 ## @category [shared] Kind cluster
-kind-cluster: $(kind_kubeconfig) | $(NEEDS_KUBECTL)
+kind-cluster-load: kind-cluster | $(NEEDS_KUBECTL)
 	mkdir -p ~/.kube
 	KUBECONFIG=~/.kube/config:$(kind_kubeconfig) $(KUBECTL) config view --flatten > ~/.kube/config
 	$(KUBECTL) config use-context kind-$(kind_cluster_name)
@@ -73,7 +80,7 @@ kind-cluster-clean: $(NEEDS_KIND)
 .PHONY: kind-logs
 ## Get the Kind cluster
 ## @category [shared] Kind cluster
-kind-logs: | kind-cluster $(NEEDS_KIND) $(bin_dir)/artifacts
-	rm -rf $(bin_dir)/artifacts/e2e-logs
-	mkdir -p $(bin_dir)/artifacts/e2e-logs
-	$(KIND) export logs $(bin_dir)/artifacts/e2e-logs --name=$(kind_cluster_name)
+kind-logs: | kind-cluster $(NEEDS_KIND) $(ARTIFACTS)
+	rm -rf $(ARTIFACTS)/e2e-logs
+	mkdir -p $(ARTIFACTS)/e2e-logs
+	$(KIND) export logs $(ARTIFACTS)/e2e-logs --name=$(kind_cluster_name)

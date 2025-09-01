@@ -30,7 +30,7 @@ The TCP port on which the metrics server will listen.
 Create a PodMonitor to add csi-driver to Prometheus if you are using Prometheus Operator. See https://prometheus-operator.dev/docs/operator/api/#monitoring.coreos.com/v1.PodMonitor
 #### **metrics.podmonitor.namespace** ~ `string`
 
-The namespace that the pod monitor should live in, defaults to the cert-manager-csi-driver namespace.
+The namespace that the pod monitor should live in, defaults to the trust-manager-csi-driver namespace.
 
 #### **metrics.podmonitor.prometheusInstance** ~ `string`
 > Default value:
@@ -102,13 +102,13 @@ For example:
 
 ```yaml
 registry: quay.io
-repository: jetstack/cert-manager-csi-driver
+repository: jetstack/trust-manager-csi-driver
 ```
 
 #### **image.repository** ~ `string`
 > Default value:
 > ```yaml
-> quay.io/jetstack/cert-manager-csi-driver
+> quay.io/jetstack/trust-manager-csi-driver
 > ```
 
 Target image repository.
@@ -241,7 +241,7 @@ Kubernetes imagePullPolicy on Deployment.
 > 1
 > ```
 
-Verbosity of cert-manager-csi-driver logging.
+Verbosity of trust-manager-csi-driver logging.
 #### **app.driver.name** ~ `string`
 > Default value:
 > ```yaml
@@ -259,7 +259,7 @@ If enabled, this uses a CSI token request for creating. CertificateRequests. Cer
 #### **app.driver.csiDataDir** ~ `string`
 > Default value:
 > ```yaml
-> /tmp/cert-manager-csi-driver
+> /tmp/trust-manager-csi-driver
 > ```
 
 Configures the hostPath directory that the driver writes and mounts volumes from.
@@ -304,7 +304,7 @@ Optional additional labels to add to the csi-driver pods.
 > {}
 > ```
 
-Kubernetes pod resources requests/limits for cert-manager-csi-driver.  
+Kubernetes pod resources requests/limits for trust-manager-csi-driver.  
   
 For example:
 
@@ -352,7 +352,7 @@ affinity:
 > []
 > ```
 
-Kubernetes pod tolerations for cert-manager-csi-driver.  
+Kubernetes pod tolerations for trust-manager-csi-driver.  
   
 For example:
 

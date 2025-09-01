@@ -30,7 +30,7 @@
 ##################################
 
 # Some modules build their dependencies from variables, we want these to be 
-# evalutated at the last possible moment. For this we use second expansion to 
+# evaluated at the last possible moment. For this we use second expansion to 
 # re-evaluate the generate and verify targets a second time.
 #
 # See https://www.gnu.org/software/make/manual/html_node/Secondary-Expansion.html
@@ -39,7 +39,7 @@
 # For details on some of these "prelude" settings, see:
 # https://clarkgrubb.com/makefile-style-guide
 MAKEFLAGS += --warn-undefined-variables --no-builtin-rules
-SHELL := /usr/bin/env bash
+SHELL := /usr/bin/env PS1="" bash
 .SHELLFLAGS := -uo pipefail -c
 .DEFAULT_GOAL := help
 .DELETE_ON_ERROR:

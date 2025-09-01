@@ -8,9 +8,14 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   self_upgrade:
     runs-on: ubuntu-latest
+
+    if: github.repository == '{{REPLACE:GH-REPOSITORY}}'
 
     permissions:
       contents: write
@@ -27,13 +32,17 @@ jobs:
           echo "This workflow should not be run on a non-branch-head."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        # Adding `fetch-depth: 0` makes sure tags are also fetched. We need
+        # the tags so `git describe` returns a valid version.
+        # see https://github.com/actions/checkout/issues/701 for extra info about this option
+        with: { fetch-depth: 0 }
 
       - id: go-version
         run: |
           make print-go-version >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: ${{ steps.go-version.outputs.result }}
 
@@ -64,7 +73,7 @@ jobs:
           git push -f origin "$SELF_UPGRADE_BRANCH"
 
       - if: ${{ steps.is-up-to-date.outputs.result != 'true' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const { repo, owner } = context.repo;
@@ -77,7 +86,7 @@ jobs:
             });
             
             if (pulls.data.length < 1) {
-              await github.rest.pulls.create({
+              const result = await github.rest.pulls.create({
                 title: '[CI] Merge ' + process.env.SELF_UPGRADE_BRANCH + ' into ' + process.env.SOURCE_BRANCH,
                 owner: owner,
                 repo: repo,
@@ -86,5 +95,11 @@ jobs:
                 body: [
                   'This PR is auto-generated to bump the Makefile modules.',
                 ].join('\n'),
+              });
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: result.data.number,
+                labels: ['ok-to-test', 'skip-review']
               });
             }

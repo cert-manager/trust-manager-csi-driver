@@ -96,7 +96,7 @@
       "type": "object"
     },
     "helm-values.app.driver.csiDataDir": {
-      "default": "/tmp/cert-manager-csi-driver",
+      "default": "/tmp/trust-manager-csi-driver",
       "description": "Configures the hostPath directory that the driver writes and mounts volumes from.",
       "type": "string"
     },
@@ -131,7 +131,7 @@
     },
     "helm-values.app.logLevel": {
       "default": 1,
-      "description": "Verbosity of cert-manager-csi-driver logging.",
+      "description": "Verbosity of trust-manager-csi-driver logging.",
       "type": "number"
     },
     "helm-values.commonLabels": {
@@ -178,11 +178,11 @@
       "type": "string"
     },
     "helm-values.image.registry": {
-      "description": "Target image registry. This value is prepended to the target image repository, if set.\nFor example:\nregistry: quay.io\nrepository: jetstack/cert-manager-csi-driver",
+      "description": "Target image registry. This value is prepended to the target image repository, if set.\nFor example:\nregistry: quay.io\nrepository: jetstack/trust-manager-csi-driver",
       "type": "string"
     },
     "helm-values.image.repository": {
-      "default": "quay.io/jetstack/cert-manager-csi-driver",
+      "default": "quay.io/jetstack/trust-manager-csi-driver",
       "description": "Target image repository.",
       "type": "string"
     },
@@ -324,7 +324,7 @@
       "type": "object"
     },
     "helm-values.metrics.podmonitor.namespace": {
-      "description": "The namespace that the pod monitor should live in, defaults to the cert-manager-csi-driver namespace.",
+      "description": "The namespace that the pod monitor should live in, defaults to the trust-manager-csi-driver namespace.",
       "type": "string"
     },
     "helm-values.metrics.podmonitor.prometheusInstance": {
@@ -440,12 +440,12 @@
     },
     "helm-values.resources": {
       "default": {},
-      "description": "Kubernetes pod resources requests/limits for cert-manager-csi-driver.\n\nFor example:\nresources:\n  limits:\n    cpu: 100m\n    memory: 128Mi\n  requests:\n    cpu: 100m\n    memory: 128Mi",
+      "description": "Kubernetes pod resources requests/limits for trust-manager-csi-driver.\n\nFor example:\nresources:\n  limits:\n    cpu: 100m\n    memory: 128Mi\n  requests:\n    cpu: 100m\n    memory: 128Mi",
       "type": "object"
     },
     "helm-values.tolerations": {
       "default": [],
-      "description": "Kubernetes pod tolerations for cert-manager-csi-driver.\n\nFor example:\ntolerations:\n- operator: \"Exists\"",
+      "description": "Kubernetes pod tolerations for trust-manager-csi-driver.\n\nFor example:\ntolerations:\n- operator: \"Exists\"",
       "items": {},
       "type": "array"
     }
