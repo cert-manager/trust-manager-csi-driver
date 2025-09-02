@@ -1,6 +1,23 @@
+/*
+Copyright 2024 The cert-manager Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package x509
 
 import (
+	//nolint:gosec // used to generate the exact same hash as openssl so the filenames match
 	"crypto/sha1"
 	"crypto/x509"
 	"encoding/asn1"
@@ -22,6 +39,7 @@ func CertificateSubjectHash(cert *x509.Certificate) (string, error) {
 		return "", err
 	}
 
+	//nolint:gosec // used to generate the exact same hash as openssl so the filenames match
 	hashed := sha1.Sum(value.Bytes)
 	encoded := hex.EncodeToString(hashed[:4])
 	return encoded[6:8] + encoded[4:6] + encoded[2:4] + encoded[0:2], nil

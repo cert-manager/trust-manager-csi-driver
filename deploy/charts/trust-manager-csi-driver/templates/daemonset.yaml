@@ -27,6 +27,8 @@ spec:
           {{- toYaml .Values.podAnnotations | nindent 8 }}
         {{- end }}
     spec:
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -37,6 +39,11 @@ spec:
       {{- end }}
       containers:
         - name: node-driver-registrar
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ "ALL" ] }
+            readOnlyRootFilesystem: true
           image: "{{ template "image" (tuple .Values.nodeDriverRegistrarImage $.Chart.AppVersion) }}"
           imagePullPolicy: {{ .Values.nodeDriverRegistrarImage.pullPolicy }}
           args:
@@ -54,6 +61,11 @@ spec:
             - name: registration-dir
               mountPath: /registration
         - name: liveness-probe
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ "ALL" ] }
+            readOnlyRootFilesystem: true
           image: "{{ template "image" (tuple .Values.livenessProbeImage $.Chart.AppVersion) }}"
           imagePullPolicy: {{ .Values.livenessProbeImage.pullPolicy }}
           args:
@@ -66,20 +78,19 @@ spec:
               mountPath: /plugin
         - name: trust-manager-csi-driver
           securityContext:
-            readOnlyRootFilesystem: true
-            privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
-            allowPrivilegeEscalation: true
             runAsUser: 0
+            privileged: true
+            capabilities: { drop: [ "ALL" ] }
+            readOnlyRootFilesystem: true
           image: "{{ template "image" (tuple .Values.image $.Chart.AppVersion) }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args :
-            - --node-id=$(NODE_ID)
             - --log-level={{ .Values.app.logLevel }}
             - --driver-name={{ .Values.app.driver.name }}
+            - --node-id=$(NODE_ID)
             - --endpoint=$(CSI_ENDPOINT)
             - --data-root=csi-data-dir
+            - --use-token-request={{ .Values.app.driver.useTokenRequest }}
             {{- if .Values.metrics.enabled }}
             - --metrics-bind-address=:{{ .Values.metrics.port }}
             {{- else }}

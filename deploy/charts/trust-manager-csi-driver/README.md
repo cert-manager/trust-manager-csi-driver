@@ -6,6 +6,11 @@
 
 <!-- AUTO-GENERATED -->
 
+#### **nameOverride** ~ `string`
+> Default value:
+> ```yaml
+> ""
+> ```
 #### **metrics.enabled** ~ `bool`
 > Default value:
 > ```yaml

@@ -1,3 +1,19 @@
+/*
+Copyright 2024 The cert-manager Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package state
 
 import (
@@ -6,11 +22,12 @@ import (
 	"os"
 	"sync"
 
-	"github.com/cert-manager/trust-manager-csi-driver/internal/api/metadata"
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/set"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/cert-manager/trust-manager-csi-driver/internal/api/metadata"
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
 )
 
 // State contains the current state of the CSI implementation, it tracks the
@@ -117,6 +134,7 @@ func (s *State) Track(meta metadata.Metadata) error {
 
 	// Create the metadata.json file
 	metadataPath := s.config.MetadataPathForVolume(meta.VolumeID)
+	//nolint:gosec // FIXME: Review required permissions
 	if err := os.WriteFile(metadataPath, data, 0644); err != nil {
 		return fmt.Errorf("could not write metadata for volume %q: %w", meta.VolumeID, err)
 	}

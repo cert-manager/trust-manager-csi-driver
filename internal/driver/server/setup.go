@@ -1,3 +1,19 @@
+/*
+Copyright 2024 The cert-manager Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package server
 
 import (
@@ -5,10 +21,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/bundlewriter"
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/state"
-	"github.com/cert-manager/trust-manager-csi-driver/internal/version"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	grpcPrometheus "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
@@ -18,6 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/bundlewriter"
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/state"
+	"github.com/cert-manager/trust-manager-csi-driver/internal/version"
 )
 
 var grpcMetrics = grpcPrometheus.NewServerMetrics()
@@ -35,7 +52,9 @@ func Setup(mgr ctrl.Manager, config *config.Config, state *state.State, bw bundl
 			defer cancel()
 
 			// Create listener for the server
-			listener, err := net.Listen(parseEndpoint(config.GRPCEndpoint))
+			network, address := parseEndpoint(config.GRPCEndpoint)
+			lc := net.ListenConfig{}
+			listener, err := lc.Listen(ctx, network, address)
 			if err != nil {
 				return err
 			}

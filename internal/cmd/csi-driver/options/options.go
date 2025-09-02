@@ -1,14 +1,25 @@
+/*
+Copyright 2024 The cert-manager Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package options
 
 import (
 	"flag"
 	"fmt"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -16,6 +27,12 @@ import (
 	"k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2/textlogger"
+
+	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/config"
+
+	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	// to ensure that exec-entrypoint and run can make use of them.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 // Options are the main options for the approver-policy. Populated via
@@ -125,9 +142,8 @@ func (o *Options) addLogFlags(fs *pflag.FlagSet) {
 
 	// Walk over the log flags, merging onto the real flagset
 	logFs.VisitAll(func(flag *pflag.Flag) {
-		switch flag.Name {
 		// Translate the "v" flag to "log-level"
-		case "v":
+		if flag.Name == "v" {
 			flag.Name = "log-level"
 			flag.Usage = "Log level (1-5)."
 			fs.AddFlag(flag)
