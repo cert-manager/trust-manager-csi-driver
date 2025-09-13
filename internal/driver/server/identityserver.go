@@ -28,6 +28,8 @@ import (
 type IdentityServer struct {
 	Name    string
 	Version string
+
+	csi.UnimplementedIdentityServer
 }
 
 func (i *IdentityServer) GetPluginInfo(context.Context, *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {

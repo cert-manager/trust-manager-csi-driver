@@ -38,8 +38,6 @@ import (
 	"github.com/cert-manager/trust-manager-csi-driver/internal/driver/state"
 )
 
-var _ csi.NodeServer = &NodeServer{}
-
 type NodeServer struct {
 	Config       *config.Config
 	State        *state.State
@@ -47,6 +45,8 @@ type NodeServer struct {
 
 	once    sync.Once
 	mounter mount.Interface
+
+	csi.UnimplementedNodeServer
 }
 
 func (n *NodeServer) setup() {
