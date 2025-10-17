@@ -44,7 +44,7 @@ require (
 )
 
 require (
-	github.com/cert-manager/trust-manager v0.20.1
+	github.com/cert-manager/trust-manager v0.20.2
 	github.com/container-storage-interface/spec v1.11.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
