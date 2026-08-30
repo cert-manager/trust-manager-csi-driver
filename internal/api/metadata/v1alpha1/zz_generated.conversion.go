@@ -85,10 +85,7 @@ func Convert_metadata_Metadata_To_v1alpha1_Metadata(in *metadata.Metadata, out *
 }
 
 func autoConvert_v1alpha1_Output_To_metadata_Output(in *Output, out *metadata.Output, s conversion.Scope) error {
-	out.Format = metadata.OutputFormat(in.Format)
-	out.UID = (*int64)(unsafe.Pointer(in.UID))
-	out.GID = (*int64)(unsafe.Pointer(in.GID))
-	out.Path = in.Path
+	*out = *(*metadata.Output)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -98,10 +95,7 @@ func Convert_v1alpha1_Output_To_metadata_Output(in *Output, out *metadata.Output
 }
 
 func autoConvert_metadata_Output_To_v1alpha1_Output(in *metadata.Output, out *Output, s conversion.Scope) error {
-	out.Format = OutputFormat(in.Format)
-	out.UID = (*int64)(unsafe.Pointer(in.UID))
-	out.GID = (*int64)(unsafe.Pointer(in.GID))
-	out.Path = in.Path
+	*out = *(*Output)(unsafe.Pointer(in))
 	return nil
 }
 
