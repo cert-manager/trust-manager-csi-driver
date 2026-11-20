@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/spf13/pflag v1.1.0
-	sigs.k8s.io/controller-runtime v0.25.2
+	sigs.k8s.io/controller-runtime v0.25.3
 )
 
 require (
